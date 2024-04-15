@@ -5,6 +5,10 @@ import pytorch_lightning as pl
 from .Resnet import CustomResNet
 from .Transformers import TransformerArchitecture
 
+from gymnasium import spaces
+
+observation_space = spaces.Box(0, 255, shape = (96, 96, 3))
+
 def merge_embedding_sequence(reward, observation, action):
     batch_size, seq_len, emb_dim = reward.size()
     combined_tensor = torch.stack((reward, observation, action), dim=1)
@@ -14,7 +18,7 @@ def merge_embedding_sequence(reward, observation, action):
     return combined_tensor
 
 class DecisionTransformers(pl.LightningModule):
-    def __init__(self, d_model, action_space_dim, observation_space, batch_first = True, max_seq_len = 32):
+    def __init__(self, d_model = 128, action_space_dim = 3, observation_space = observation_space, batch_first = True, max_seq_len = 32):
         super(DecisionTransformers, self).__init__()
 
         #reward, action, observation to embedding
@@ -52,7 +56,7 @@ class DecisionTransformers(pl.LightningModule):
         #Calculating embedding
         rewards_emb = self.embedding_reward(rewards)
         actions_emb = self.embedding_action(actions)
-        observations_emb = torch.empty((batch_len,seq_len, self.emb_dim))
+        observations_emb = torch.empty((batch_len, seq_len, self.emb_dim))
         
         for batch_index, batch_imgs in enumerate(observations):
             observations_emb[batch_index] = self.embedding_observation(batch_imgs)

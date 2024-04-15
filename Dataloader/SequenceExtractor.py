@@ -33,12 +33,35 @@ def collate_fn(data):
              "actions":actions,
             }, labels
 
+def padInput(rewards, observations, actions, seq_len = 32):
+        # Calculate padding length
+    pad_len = max(0, seq_len - n)
+    n = rewards.shape[0]
+    
+    # Pad each array
+    # Rewards: Expected shape after padding (seq_len, 1)
+    rewards_padded = np.pad(rewards, ((0, pad_len), (0, 0)), 'constant', constant_values=0)
+    
+    # Observations: Expected shape after padding (seq_len, 3)
+    observations_padded = np.pad(observations, (0, pad_len), (0, 0), (0, 0), (0, 0)) , 'constant', constant_values=0)
+    
+    # Actions: Expected shape after padding (seq_len, 3, 96, 96)
+    actions_padded = np.pad(actions, ((0, pad_len), (0, 0), (0, 0))(, 'constant', constant_values=0)
+    
+    # Return a dictionary with padded arrays
+    return {
+        'rewards': rewards_padded,
+        'observations': observations_padded,
+        'actions': actions_padded
+    }
+
 class SequenceExtractor(Dataset):
-    def __init__(self, env, seq_len = 32, dataset_len = 16384):
+    def __init__(self, env, seq_len = 32, dataset_len = 16384, starting_num = 0):
         self.seq_len = seq_len
         self.dataset_len = dataset_len
         self.env = env
         self.env_name = env.unwrapped.envs[0].spec.id
+        self.starting_num = starting_num
 
     def __len__(self):
         return self.dataset_len
@@ -46,6 +69,7 @@ class SequenceExtractor(Dataset):
     ## il seed è usato come indice
     def __getitem__(self, seed):
         if seed is not None:
+            seed += self.starting_num
             random.seed(seed)
         # List all subfolders in the folder
         models_subfolder = [f.path for f in os.scandir(self.env_name) if f.is_dir()]
