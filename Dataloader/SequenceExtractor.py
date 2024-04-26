@@ -43,10 +43,10 @@ def padInput(rewards, observations, actions, seq_len = 32):
     rewards_padded = np.pad(rewards, ((0, pad_len), (0, 0)), 'constant', constant_values=0)
     
     # Observations: Expected shape after padding (seq_len, 3)
-    observations_padded = np.pad(observations, (0, pad_len), (0, 0), (0, 0), (0, 0)) , 'constant', constant_values=0)
+    observations_padded = np.pad(observations, ((0, pad_len), (0, 0), (0, 0), (0, 0)) , 'constant', constant_values=0)
     
     # Actions: Expected shape after padding (seq_len, 3, 96, 96)
-    actions_padded = np.pad(actions, ((0, pad_len), (0, 0), (0, 0))(, 'constant', constant_values=0)
+    actions_padded = np.pad(actions, ((0, pad_len), (0, 0), (0, 0)), 'constant', constant_values=0)
     
     # Return a dictionary with padded arrays
     return {
@@ -62,6 +62,7 @@ class SequenceExtractor(Dataset):
         self.env = env
         self.env_name = env.unwrapped.envs[0].spec.id
         self.starting_num = starting_num
+        self.max_rewards = 800
 
     def __len__(self):
         return self.dataset_len
@@ -98,8 +99,8 @@ class SequenceExtractor(Dataset):
         #print(rewards.shape, observation.shape, input_action.shape)
 
         X = {
-            "reward":reward, 
-            "observation":observation, 
+            "reward":reward/self.max_rewards, 
+            "observation":observation/255., 
             "action":input_action,
             }
         Y = np.stack(df["action"][starting_row + 1:ending_row + 1])

@@ -11,11 +11,12 @@ observation_space = spaces.Box(0, 255, shape = (96, 96, 3))
 
 def merge_embedding_sequence(reward, observation, action):
     batch_size, seq_len, emb_dim = reward.size()
-    combined_tensor = torch.stack((reward, observation, action), dim=1)
-    #print(combined_tensor.shape)
-    combined_tensor = combined_tensor.view(batch_size, seq_len * 3, emb_dim)
-    #print(combined_tensor.shape)
-    return combined_tensor
+    # Stack the tensors along a new dimension (dim=0) and then permute
+    stacked = torch.stack((reward, observation, action), dim=0)
+    permuted = stacked.permute(1, 2, 0, 3)  # Now shape is [batch, seq_len, 3, dimension]
+    # Reshape to merge the second and third dimensions
+    result = permuted.reshape(batch_size, 3*seq_len, emb_dim)
+    return result
 
 class DecisionTransformers(pl.LightningModule):
     def __init__(self, d_model = 128, action_space_dim = 3, observation_space = observation_space, batch_first = True, max_seq_len = 32):

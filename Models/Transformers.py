@@ -58,7 +58,7 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerArchitecture(nn.Module):
-    def __init__(self, d_model=256, n_head=8, n_layer=4, 
+    def __init__(self, d_model=256, n_head=8, n_layer=8, 
                  d_ff=1024, max_step_len=512, dropout = 0.1, batch_first = True):
         super(TransformerArchitecture, self).__init__()
         self.dropout = dropout
@@ -87,7 +87,7 @@ class TransformerArchitecture(nn.Module):
         # Each step is made by reward, observation, action
         step_len = x.size(1) // 3 
         
-        x = self.positional_embedding(x)
+        x = x + self.positional_embedding(x)
         
         # Masking
         attention_mask = step_masking(step_len).to(device=x.device, dtype=torch.float32)
