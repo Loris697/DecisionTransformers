@@ -69,8 +69,10 @@ class DecisionTransformers(pl.LightningModule):
 
         output = self.transformer(sequence)
 
+        #print(output.shape)
+        
         # Extract the output related to the observation input
-        sequence = sequence[:, 1::3, :]
+        output = output[:, 1::3, :]
 
         #Fully connected layer to get the action
         output = self.fc1(output)
@@ -80,11 +82,13 @@ class DecisionTransformers(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
+
+        #print(y_hat.shape, y.shape)
         
         # Compute three different dimension of action space
-        loss1 = F.huber_loss(y_hat[:, 0], y[:, 0])
-        loss2 = F.huber_loss(y_hat[:, 1], y[:, 1])
-        loss3 = F.huber_loss(y_hat[:, 2], y[:, 2])
+        loss1 = F.huber_loss(y_hat[:,:, 0], y[:,:,0])
+        loss2 = F.huber_loss(y_hat[:,:,1], y[:,:,1])
+        loss3 = F.huber_loss(y_hat[:,:,2], y[:,:,2])
         
         # Total loss is the sum of the three losses
         total_loss = loss1 + loss2 + loss3
@@ -99,11 +103,13 @@ class DecisionTransformers(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
+
+        #print(y_hat.shape, y.shape)
         
         # Compute three different dimension of action space
-        loss1 = F.huber_loss(y_hat[:, 0], y[:, 0])  # Loss for first value
-        loss2 = F.huber_loss(y_hat[:, 1], y[:, 1])  # Loss for second value
-        loss3 = F.huber_loss(y_hat[:, 2], y[:, 2])  # Loss for third value
+        loss1 = F.huber_loss(y_hat[:,:, 0], y[:,:,0])  # Loss for first value
+        loss2 = F.huber_loss(y_hat[:,:, 1], y[:,:,1])  # Loss for second value
+        loss3 = F.huber_loss(y_hat[:,:, 2], y[:,:,2])  # Loss for third value
         
         # Total loss is the sum of the three losses
         total_loss = loss1 + loss2 + loss3
@@ -116,5 +122,5 @@ class DecisionTransformers(pl.LightningModule):
         return total_loss
     
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
         return optimizer

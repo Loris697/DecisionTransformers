@@ -1,3 +1,7 @@
 CarRacing-v2/
 .ipynb_checkpoints/
 lightning_logs/
+checkpoints/
+tb_logs/
+Dataloader/__pycache__
+Models/__pycache__

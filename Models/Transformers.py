@@ -29,7 +29,7 @@ def step_masking(step_len):
     return attention_mask
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 512, position: torch.Tensor = None):
+    def __init__(self, d_model: int, dropout: float = 0.0, max_len: int = 512, position: torch.Tensor = None):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
@@ -58,8 +58,8 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerArchitecture(nn.Module):
-    def __init__(self, d_model=256, n_head=8, n_layer=8, 
-                 d_ff=1024, max_step_len=512, dropout = 0.1, batch_first = True):
+    def __init__(self, d_model=256, n_head=8, n_layer=24, 
+                 d_ff=1024, max_step_len=512, dropout = 0.0, batch_first = True):
         super(TransformerArchitecture, self).__init__()
         self.dropout = dropout
         self.activation = nn.GELU()
@@ -87,7 +87,7 @@ class TransformerArchitecture(nn.Module):
         # Each step is made by reward, observation, action
         step_len = x.size(1) // 3 
         
-        x = x + self.positional_embedding(x)
+        x = self.positional_embedding(x)
         
         # Masking
         attention_mask = step_masking(step_len).to(device=x.device, dtype=torch.float32)
