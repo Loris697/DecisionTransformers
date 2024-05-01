@@ -3,5 +3,6 @@ CarRacing-v2/
 lightning_logs/
 checkpoints/
 tb_logs/
-Dataloader/__pycache__
-Models/__pycache__
+codebase/Dataloader/__pycache__/*
+codebase/Models/__pycache__/*
+codebase/__pycache__/*

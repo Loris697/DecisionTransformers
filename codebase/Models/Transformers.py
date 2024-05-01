@@ -1,111 +1,121 @@
 import torch
 import torch.nn as nn
-import math
 import torch.nn.functional as F
-
-def repeat_integers(integers):
-    # Repeat each integer three times
-    repeated_integers = torch.repeat_interleave(integers, 3)
-    # Trim the tensor to the maximum length
-    repeated_integers = repeated_integers
-    return repeated_integers
-
-def set_elements_to_zero(row, index):
-    # Create a mask tensor
-    mask = torch.zeros_like(row)
-    mask[index:] = 1
-    # Set elements before the index to zero
-    row = row * mask
-    return torch.nan_to_num(row, neginf = -float('inf'))
-
-def step_masking(step_len):
-    seq_len = step_len * 3
-    attention_mask = torch.full((seq_len, seq_len), -float('inf'), dtype=torch.float32)
-    for step in range(1, step_len + 1):
-        row_set = step - 1
-        for sequence_element in [row_set * 3, row_set * 3 + 1, row_set * 3 + 2]:
-            attention_mask[sequence_element] = set_elements_to_zero(attention_mask[sequence_element], step * 3)
-    
-    return attention_mask
-
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, dropout: float = 0.0, max_len: int = 512, position: torch.Tensor = None):
-        super().__init__()
-        self.dropout = nn.Dropout(p=dropout)
-
-        if position is None:
-            position = torch.arange(max_len)
-
-        pe = torch.zeros(1, max_len, d_model)  # Shape: [1, max_len, d_model]
-            
-        position = position.float().unsqueeze(1)  # Shape: [1, max_len]
-        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model)).unsqueeze(0) 
-        argument = position @ div_term
-
-        pe[:, :, 0::2] = torch.sin(argument)
-        pe[:, :, 1::2] = torch.cos(argument)
-        self.register_buffer('pe', pe)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Arguments:
-            x: Tensor, shape ``[batch_size, seq_len, embedding_dim]``
-        """
-        # Instead of adding positional encodings along the sequence dimension,
-        # we add them along the batch dimension.
-        x = x + self.pe[:, :x.size(1)]
-        return self.dropout(x)
 
 
 class TransformerArchitecture(nn.Module):
-    def __init__(self, d_model=256, n_head=8, n_layer=24, 
-                 d_ff=1024, max_step_len=512, dropout = 0.0, batch_first = True):
-        super(TransformerArchitecture, self).__init__()
-        self.dropout = dropout
-        self.activation = nn.GELU()
+    """
+    Implements a simplified version of the Transformer architecture as described in
+    "Attention is All You Need" by Vaswani et al. This class allows for customizable
+    configuration of the transformer model with varying number of layers, heads,
+    and dimensionality.
 
-        positions = repeat_integers(torch.arange(0, max_step_len))
-        
-        self.positional_embedding = PositionalEncoding(d_model,max_len = max_step_len*3, position = positions)
+    Args:
+        positional_embedding (nn.Module): The positional embedding module to be used.
+        positions (torch.Tensor, optional): Tensor specifying the positions; if None, positions
+                                            are generated up to `max_step_len`.
+        activation (nn.Module, optional): Activation to be used in feed-forward networks.
+        d_model (int): Dimensionality of the model and embeddings.
+        n_head (int): Number of attention heads.
+        n_layer (int): Number of stacked transformer layers.
+        d_ff (int): Dimension of the feed-forward network.
+        max_step_len (int): Maximum length of the input sequences allowed.
+        dropout (float): Dropout rate for regularization.
+        batch_first (bool): Whether the first dimension of the input tensor represents batch size.
+
+    Attributes:
+        dropout (float): Dropout rate.
+        activation (nn.Module): Activation function used in feed-forward networks.
+        positions (torch.Tensor): Positions tensor used for positional encoding.
+        positional_embedding (nn.Module): Instance of the positional embedding module.
+        attentions (nn.ModuleList): List of multi-head attention layers.
+        linear1 (nn.ModuleList): First linear transformation in the feed-forward network.
+        linear2 (nn.ModuleList): Second linear transformation in the feed-forward network.
+        layer_norms1 (nn.ModuleList): Layer normalization after the attention layers.
+        layer_norms2 (nn.ModuleList): Layer normalization after the feed-forward network.
+    """
+    def __init__(self, 
+                 positional_embedding: nn.Module, 
+                 positions: torch.Tensor = None,
+                 activation: nn.Module = nn.GELU(),
+                 d_model: int = 256, 
+                 n_head: int = 8, 
+                 n_layer: int = 24, 
+                 d_ff: int = 1024,
+                 max_step_len: int = 512, 
+                 dropout: float = 0.0, 
+                 batch_first: bool = True
+                ):
+        super(TransformerArchitecture, self).__init__()
+
+        self.dropout = dropout
+        self.activation = activation
+        self.max_step_len = max_step_len
+        self.d_model = d_model
+
+        if positions is None:
+            positions = torch.arange(max_step_len)
+        self.positions = positions
+
+        self.positional_emb_callable = positional_embedding
+        self.positional_embedding = self.positional_emb_callable(
+            d_model=d_model,
+            max_len=max_step_len,
+            position=self.positions
+        )
+
         self.attentions = nn.ModuleList([
-            nn.MultiheadAttention(d_model, n_head, batch_first = batch_first)
+            nn.MultiheadAttention(d_model, n_head, batch_first=batch_first)
             for _ in range(n_layer)
         ])
-        self.linear1 = nn.ModuleList([
-            nn.Linear(d_model, d_ff)
-            for _ in range(n_layer)
-        ])
-        self.linear2 = nn.ModuleList([
-            nn.Linear(d_ff, d_model)
-            for _ in range(n_layer)
-        ])
+
+        self.linear1 = nn.ModuleList([nn.Linear(d_model, d_ff) for _ in range(n_layer)])
+        self.linear2 = nn.ModuleList([nn.Linear(d_ff, d_model) for _ in range(n_layer)])
 
         self.layer_norms1 = nn.ModuleList([nn.LayerNorm(d_model) for _ in range(n_layer)])
         self.layer_norms2 = nn.ModuleList([nn.LayerNorm(d_model) for _ in range(n_layer)])
-        
-    def forward(self, x):
-        # Each step is made by reward, observation, action
-        step_len = x.size(1) // 3 
-        
+
+    def forward(self, x, attention_mask=None):
+        """
+        Forward pass of the transformer model.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape [batch_size, sequence_length, d_model].
+            attention_mask (torch.Tensor, optional): Optional mask for the attention layers to ignore certain positions.
+
+        Returns:
+            torch.Tensor: Output tensor of the transformer model with the same shape as `x`.
+        """
         x = self.positional_embedding(x)
-        
-        # Masking
-        attention_mask = step_masking(step_len).to(device=x.device, dtype=torch.float32)
-            
+
         for i in range(len(self.attentions)):
-            # Multi-head Attention
+            # Multi-head Attention layer
             residual = x
             x, _ = self.attentions[i](x, x, x, attn_mask=attention_mask)
             x = F.dropout(x, p=self.dropout, training=self.training)
-            x = residual + x  # Residual connection
+            x = residual + x
             x = self.layer_norms1[i](x)
-            
+
             # Feed-forward network
             residual = x
             x = self.activation(self.linear1[i](x))
             x = F.dropout(x, p=self.dropout, training=self.training)
             x = self.linear2[i](x)
-            x = residual + x  # Residual connection
+            x = residual + x
             x = self.layer_norms2[i](x)
-            
+
         return x
+
+    def setPosition(self, positions):
+        """
+        Update the positional embeddings with new positions.
+
+        Args:
+            positions (torch.Tensor): New positions tensor to update the model's positional encodings.
+        """
+        self.positions = positions
+        self.positional_embedding = self.positional_emb_callable(
+            d_model=self.d_model,
+            max_len=self.max_step_len,
+            position=self.positions
+        )
